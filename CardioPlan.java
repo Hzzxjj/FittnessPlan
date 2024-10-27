@@ -1,14 +1,3 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
-package fittnessplan;
-
-/**
- *
- * @author hanan
- */
 public class CardioPlan implements FitnessPlan {
     private final String planName = "Cardio Plan";
     private final int minimumDuration = 150; // in minutes
