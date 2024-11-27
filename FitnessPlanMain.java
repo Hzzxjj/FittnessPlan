@@ -1,10 +1,14 @@
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.InputMismatchException;
 import java.util.List;
 import java.util.Scanner;
 
 public class FitnessPlanMain {
-    public static void main(String[] args) {
+    private static User loggedInUser;
+
+    public static void main(String[] args) throws NoSuchAlgorithmException {
         List<FitnessPlan> plans = new ArrayList<>();
         plans.add(new CardioPlan());
         plans.add(new StrengthPlan());
@@ -14,8 +18,36 @@ public class FitnessPlanMain {
 
         Scanner scanner = new Scanner(System.in);
 
-        // Get user fitness level using numeric input
         System.out.println("========= Fitness Plan Recommendation System =========");
+
+        // loop
+        while (loggedInUser == null) {
+            System.out.println("1 - Login");
+            System.out.println("2 - Create Account");
+            System.out.println("3 - Log out");
+            System.out.print("Choose an option: ");
+
+            String choice = scanner.nextLine();
+
+            if (choice.equals("1")) {
+                login(scanner);
+            } else if (choice.equals("2")) {
+                createAccount(scanner);
+            } else if (choice.equals("3")) {
+                System.out.println("Log out successful");
+                scanner.close();
+                return;
+            } else {
+                System.out.println("Invalid choice. Please try again.");
+            }
+        }
+
+        // Display Message
+        System.out.println("\nLogin successful!");
+        System.out.println("Welcome, " + loggedInUser.getUsername() + "!");
+        System.out.println("Phone: " + loggedInUser.getPhone());
+
+        // Get user fitness level using numeric input
         String userFitnessLevel = getUserFitnessLevel(scanner);
 
         // Ask for medical conditions with validation for "yes/no"
@@ -26,6 +58,17 @@ public class FitnessPlanMain {
             medicalCondition = getUserMedicalCondition(scanner);
         }
 
+        // Generate checksum for the user's fitness level and medical condition
+        String fitnessLevelChecksum = ChecksumUtil.generateChecksum(userFitnessLevel);
+        String medicalConditionChecksum = ChecksumUtil.generateChecksum(medicalCondition);
+
+        // Simulate storing the checksum (in a real app, store in the database)
+        System.out.println("Stored Fitness Level Checksum: " + fitnessLevelChecksum);
+        System.out.println("Stored Medical Condition Checksum: " + medicalConditionChecksum);
+
+        // Verify integrity of the data before proceeding (just for demonstration)
+        verifyDataIntegrity(userFitnessLevel, medicalCondition, fitnessLevelChecksum, medicalConditionChecksum);
+
         // Display suggested fitness plans and their required weekly exercise time
         System.out.println("\n========= Suggested Fitness Plans =========");
         for (FitnessPlan plan : plans) {
@@ -34,9 +77,13 @@ public class FitnessPlanMain {
                 int totalWeeklyMinutes = plan.getMinimumDuration() * 5; // Assuming 5 days a week
                 System.out.println("-------------------------------------------");
                 System.out.println("Fitness Plan: " + plan.getPlanName());
-                System.out.println("  - Minimum Duration: " + plan.getMinimumDuration() + " minutes/day");
-                System.out.println("  - Additional Minutes (based on your fitness level): " + additionalMinutes + " minutes/day");
-                System.out.println("  - Total Weekly Time: " + totalWeeklyMinutes + " minutes/week");
+                System.out.println("  - Minimum Duration: "
+                        + plan.getMinimumDuration() + " minutes/day");
+                System.out.println(
+                        "  - Additional Minutes (based on your fitness level): "
+                                + additionalMinutes + " minutes/day");
+                System.out.println("  - Total Weekly Time: "
+                        + totalWeeklyMinutes + " minutes/week");
 
                 // Additional notes based on medical condition
                 if (!medicalCondition.equals("None")) {
@@ -47,6 +94,85 @@ public class FitnessPlanMain {
         System.out.println("===========================================");
 
         scanner.close();
+    }
+
+    // Method to verify data integrity
+    private static void verifyDataIntegrity(String fitnessLevel, String medicalCondition, String storedFitnessChecksum,
+            String storedMedicalChecksum) throws NoSuchAlgorithmException {
+        boolean fitnessLevelIntegrity = ChecksumUtil.verifyChecksum(fitnessLevel, storedFitnessChecksum);
+        boolean medicalConditionIntegrity = ChecksumUtil.verifyChecksum(medicalCondition, storedMedicalChecksum);
+
+        if (fitnessLevelIntegrity && medicalConditionIntegrity) {
+            System.out.println("Data integrity verified. The input has not been tampered with.");
+        } else {
+            System.out.println("Data integrity compromised! The input has been tampered with.");
+        }
+    }
+
+    // Method to hash the password and generate a checksum
+    private static String hashPassword(String password) {
+        try {
+            MessageDigest md = MessageDigest.getInstance("SHA-256");
+            byte[] hashedBytes = md.digest(password.getBytes());
+            StringBuilder hexString = new StringBuilder();
+            for (byte b : hashedBytes) {
+                String hex = Integer.toHexString(0xff & b);
+                if (hex.length() == 1) {
+                    hexString.append('0');
+                }
+                hexString.append(hex);
+            }
+            return hexString.toString();
+        } catch (NoSuchAlgorithmException e) {
+            throw new RuntimeException("Hashing algorithm not found!", e);
+        }
+    }
+
+    // Login method: Hash entered password and compare with stored checksum
+    private static void login(Scanner scanner) {
+        System.out.print("Enter your username: ");
+        String username = scanner.nextLine();
+        System.out.print("Enter your password: ");
+        String password = scanner.nextLine();
+
+        // Hash the entered password to generate the checksum
+        String hashedPassword = hashPassword(password);
+
+        loggedInUser = User.login(username, hashedPassword);
+        if (loggedInUser == null) {
+            System.out.println("Invalid username or password. Please try again.");
+        } else {
+            System.out.println("Login successful!");
+        }
+    }
+
+    // Create account method: Hash password before saving
+    private static void createAccount(Scanner scanner) {
+        System.out.print("Enter a username: ");
+        String username = scanner.nextLine();
+
+        System.out.print("Enter your phone number (10 digits): ");
+        String phone = scanner.nextLine();
+        while (!phone.matches("\\d{10}")) {
+            System.out.print("Invalid phone number. Please enter a valid 10 digit phone number: ");
+            phone = scanner.nextLine();
+        }
+
+        System.out.print("Enter a password (exactly 8 characters): ");
+        String password = scanner.nextLine();
+        while (password.length() != 8) {
+            System.out.print("Invalid password. It must be exactly 8 characters long. Please try again: ");
+            password = scanner.nextLine();
+        }
+
+        // Hash the password before saving it in the database
+        String hashedPassword = hashPassword(password);
+
+        if (User.createAccount(username, phone, hashedPassword)) {
+            System.out.println("Account created successfully! You can now log in.");
+        } else {
+            System.out.println("Username already exists. Please choose a different username.");
+        }
     }
 
     // Method to get user fitness level with input validation
@@ -60,6 +186,7 @@ public class FitnessPlanMain {
                 System.out.println("3 - Advanced");
                 System.out.println("======================================================");
                 int fitnessLevelChoice = scanner.nextInt();
+                scanner.nextLine(); // Consume newline
                 switch (fitnessLevelChoice) {
                     case 1:
                         fitnessLevel = "Beginner";
@@ -87,6 +214,7 @@ public class FitnessPlanMain {
         while (input == null) {
             System.out.println(question);
             String userInput = scanner.next().trim().toLowerCase();
+            scanner.nextLine(); // Consume newline
             if (userInput.equals("yes") || userInput.equals("no")) {
                 input = userInput;
             } else {
@@ -109,6 +237,7 @@ public class FitnessPlanMain {
                 System.out.println("======================================================");
 
                 int medicalConditionChoice = scanner.nextInt();
+                scanner.nextLine(); // Consume newline
                 switch (medicalConditionChoice) {
                     case 1:
                         medicalCondition = "Asthma";
@@ -121,7 +250,7 @@ public class FitnessPlanMain {
                         break;
                     case 4:
                         System.out.println("Please describe your condition:");
-                        medicalCondition = scanner.next();
+                        medicalCondition = scanner.nextLine();
                         break;
                     default:
                         System.out.println("Invalid choice. Please select a valid option.");
@@ -142,13 +271,16 @@ public class FitnessPlanMain {
                 System.out.println("As you have asthma, avoid over-exertion, especially in cold or dry conditions.");
                 break;
             case "Heart Condition":
-                System.out.println("With a heart condition, it’s important to monitor your heart rate and avoid high-intensity exercises.");
+                System.out.println(
+                        "With a heart condition, it’s important to monitor your heart rate and avoid high-intensity exercises.");
                 break;
             case "Joint Issues":
-                System.out.println("Since you have joint issues, avoid high-impact activities that put stress on your knees, hips, and joints.");
+                System.out.println(
+                        "Since you have joint issues, avoid high-impact activities that put stress on your knees, hips, and joints.");
                 break;
             default:
-                System.out.println("Since you have " + medicalCondition + ", please consult with a physician before starting this fitness plan.");
+                System.out.println("Since you have " + medicalCondition
+                        + ", please consult with a physician before starting this fitness plan.");
                 break;
         }
     }
